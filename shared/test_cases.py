@@ -48,6 +48,16 @@ User: ali
 Severity: Critical
 Description: Large amount of confidential files downloaded after successful login.
 """
-}
+},
+    {
+        "name": "Combined Attack (Tricky Input)",
+        "alert": """
+IP: 192.168.1.10
+User: mariem
+Severity: High
+Description: Known malicious IP, multiple failed login attempts,
+login from a new device at midnight, and large data upload to an external server.
+"""
+    }
 
 ]
