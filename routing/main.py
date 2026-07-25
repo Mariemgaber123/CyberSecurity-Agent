@@ -73,13 +73,11 @@ def route_alert(alert):
 
 
 def main():
-    for case in test_cases:
-        print("\n" + "=" * 50)
-        print("Test Case:", case["name"])
-        print("=" * 50)
+    print("=" * 50)
+    print("Test Case:", test_cases[-1]["name"])
+    print("=" * 50)
 
-        route_alert(case["alert"])
-
+    route_alert(test_cases[-1]["alert"])
 
 if _name_ == "__main__":
     main()
