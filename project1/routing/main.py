@@ -1,6 +1,6 @@
-from shared.llm import ask_gemini
-from shared.test_cases import test_cases
-from shared.tools import block_ip, close_alert, escalate_case
+from project1.shared.llm import ask_gemini
+from project1.shared.test_cases import test_cases
+from project1.shared.tools import block_ip, close_alert, escalate_case
 
 
 ROUTES = ["BLOCK_IP", "CLOSE_ALERT", "ESCALATE"]
