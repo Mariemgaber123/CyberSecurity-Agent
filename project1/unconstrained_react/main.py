@@ -1,5 +1,5 @@
-from unconstrained_react.agent import run_agent
-from shared.test_cases import test_cases
+from project1.unconstrained_react.agent import run_agent
+from project1.shared.test_cases import test_cases
 
 
 def main():
