@@ -1,4 +1,4 @@
-from shared.tools import (
+from project1.shared.tools import (
     get_user_history,
     check_ip_reputation,
     block_ip,

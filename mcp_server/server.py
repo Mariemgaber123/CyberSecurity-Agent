@@ -1,4 +1,9 @@
 from fastmcp import FastMCP
+from .capabilities import CAPABILITIES
+from .resources import list_resources, read_resource
+from .prompts import get_prompt
+from .resources import list_resources, read_resource
+
 
 mcp = FastMCP("CyberSecurityAgent")
 
@@ -11,7 +16,10 @@ def ping() -> str:
     return "MCP Server is running!"
 
 
-from . import tools
+from shared import tools
+
+print("Initializing MCP Server...")
+print(CAPABILITIES)
 
 
 if __name__ == "__main__":
