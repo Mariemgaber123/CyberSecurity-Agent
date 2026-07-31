@@ -1,5 +1,4 @@
 PROMPTS = {
-
     "incident_summary": """
 Summarize Incident {incident_id}
 using the available database information.
@@ -16,9 +15,7 @@ Explain why it is suspicious.
 Write an Incident Closure Report
 for Incident {incident_id}.
 """
-
 }
 
 def get_prompt(name):
-
     return PROMPTS.get(name)

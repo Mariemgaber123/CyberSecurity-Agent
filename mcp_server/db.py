@@ -1,16 +1,10 @@
 import sqlite3
 from pathlib import Path
 
-# mcp_server/db.py  ->  parent.parent is the project root  ->  db/security.db
 DB_PATH = Path(__file__).parent.parent / "db" / "security.db"
 
 
 def get_connection() -> sqlite3.Connection:
-    """
-    Single place that opens a connection to security.db.
-    Row factory is set so we can access columns by name (row['status'])
-    instead of brittle positional indexing.
-    """
     if not DB_PATH.exists():
         raise FileNotFoundError(
             f"security.db not found at {DB_PATH}. "
