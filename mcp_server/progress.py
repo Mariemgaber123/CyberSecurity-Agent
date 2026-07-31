@@ -1,16 +1,20 @@
-import time
+import asyncio
+from fastmcp import Context
 
 
-def show_progress(task_name: str):
+async def show_progress(task_name: str, ctx: Context):
     """
-    Simulate a long-running task by reporting progress.
-    This can later be replaced with real MCP progress notifications.
+    Report progress updates to the MCP client.
     """
 
-    steps = [0, 20, 40, 60, 80, 100]
+    for i in range(0, 101, 20):
+        await ctx.report_progress(
+            progress=i,
+            total=100
+        )
 
-    for percent in steps:
-        print(f"[PROGRESS] {task_name}: {percent}%")
-        time.sleep(0.5)
+        print(f"[PROGRESS] {task_name}: {i}%")
+
+        await asyncio.sleep(0.5)
 
     print(f"[DONE] {task_name}")
