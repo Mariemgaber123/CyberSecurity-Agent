@@ -102,6 +102,165 @@ a Critical device (`WEB-SERVER-01`) and a Normal device
 (`EMPLOYEE-LAPTOP-22`), plus one High and one Critical severity incident
 so `close_incident`'s role check has real cases to hit.
 
+ # CyberSecurity MCP Agent
+
+A Model Context Protocol (MCP) based CyberSecurity Agent designed to simulate a Security Operations Center (SOC) assistant.
+
+The system provides an MCP client that communicates with an MCP server exposing security-related tools connected to a database. The agent can perform security operations such as checking user history, analyzing IP reputation, blocking suspicious IPs, managing incidents, and generating security reports.
+
+---
+
+## Team Members
+
+- **Mariem Gaber**
+- **Aser Alaa**
+
+At the beginning of the project, we divided the tasks between us to work on different components independently. After completing the initial parts, we collaborated on integrating all components, debugging issues, improving the architecture, and reaching the final working solution together.
+
+---
+
+# Project Architecture
+
+The project follows an MCP client-server architecture:
+
+CyberSecurity-Agent
+│
+├── client
+│ └── agent.py
+│
+├── mcp_server
+│ └── server.py
+│
+├── shared
+│ └── tools.py
+│
+└── database
+└── security.db
+
+
+---
+
+# System Components
+
+## 1. MCP Client
+
+The client acts as the user interface and communicates with the MCP server.
+
+Responsibilities:
+
+- Connect to MCP server
+- Perform capability checking
+- Call available security tools
+- Display results to the user
+
+The client initially used **stdio transport** during development and was later migrated to **Streamable HTTP transport**.
+
+---
+
+## 2. MCP Server
+
+The MCP server exposes cybersecurity operations as MCP tools.
+
+Implemented tools:
+
+### User History
+
+Retrieves information about a specific user.
+
+Example:
+user_history(user="Mariem Gaber")
+
+
+---
+
+### IP Reputation
+
+Checks whether an IP exists in the threat intelligence database and retrieves its reputation and severity.
+
+Example:
+
+
+ip_reputation(ip="192.168.1.50")
+
+
+---
+
+### Block IP
+
+Blocks a suspicious IP address after validating the request and checking authorization.
+
+The operation includes:
+
+- IP validation
+- User authorization verification
+- Database state update
+- Audit logging
+
+Only users with the **Security Manager** role can perform this operation.
+
+---
+
+### Close Incident
+
+Closes an existing security incident after verifying permissions.
+
+---
+
+### Escalate Incident
+
+Escalates a security incident and records the action.
+
+---
+
+### Send Email
+
+Simulates sending an email notification and stores the action in audit logs.
+
+---
+
+### Generate Security Report
+
+A long-running operation that generates a security report.
+
+The process includes multiple stages:
+
+1. Collecting incident data
+2. Analyzing threats
+3. Calculating statistics
+4. Preparing the final report
+
+The tool uses MCP progress notifications to provide continuous feedback instead of leaving the client waiting without updates.
+
+Example:
+
+
+Progress: 1/5
+Progress: 2/5
+Progress: 3/5
+Progress: 4/5
+Progress: 5/5
+
+Report generated successfully.
+
+
+---
+
+# Database Layer
+
+The project uses a relational database to store:
+
+- Users
+- Devices
+- Threat intelligence data
+- Security incidents
+- Incident actions
+- Audit logs
+
+The database is accessed through a shared data layer to separate database operations from MCP communication logic.
+
+---
+
+
 ## 3. Protocol Concerns → Where They Live
 
 | Concern | File | How it fires |
@@ -125,8 +284,6 @@ so `close_incident`'s role check has real cases to hit.
 | `user_history` | read | no | no |
 | `isolate_device` | **write** | **yes, if device is Critical** (POLICY-IR-001) | no (elicitation *is* the control) |
 | `close_incident` | **write** | no | **yes** — Critical/High severity requires Security Manager role (POLICY-IM-002) |
-| `escalate` | write | no | no |
-| `notify_user` | write (stub) | no | no |
 | `generate_closure_report` | write-adjacent (sampling) | no | no |
 
 **If a connected client doesn't declare a capability one of these tools
@@ -139,61 +296,146 @@ needs:**
   (planned: gate this via `tools/list_changed` based on declared client
   capabilities).
 
-## 5. Project Layout
 
-```
-CyberSecurity-Agent/
-  db/
-    schema.sql
-    seed.sql
-    init_db.py        # builds security.db from schema.sql + seed.sql
-    security.db        # generated, not committed
-  mcp_server/
-    server.py          # FastMCP instance, resources, prompts, transport
-    tools.py            # all @mcp.tool definitions
-    db.py                # security.db connection helper
-    validation.py         # Pydantic request models
-    resources.py           # policy content lookup
-    prompts.py               # prompt templates
-    progress.py                # progress-reporting helper
-    elicitation.py               # console fallback confirm helper
-    capabilities.py                # documentation-only capability notes
-  client/
-    agent.py            # MCP client: handshake, sampling + elicitation callbacks, demo calls
-```
+# MCP Protocol Features Implemented
 
-## 6. Running It
+## 1. Capability Negotiation
 
-```powershell
-# 1. Build the database (run once, or any time you want to reset it)
-cd db
-python init_db.py
-cd ..
+The client performs an initialization exchange with the MCP server and checks available tools before using them.
 
-# 2. (optional but needed for real sampling output)
-pip install anthropic
-setx ANTHROPIC_API_KEY "sk-ant-..."
+The client retrieves the available server tools dynamically instead of assuming server capabilities.
 
-# 3. Start the server (leave this terminal running)
-python -m mcp_server.server
+Example:
 
-# 4. In a second terminal, run the demo client
+
+Available tools:
+
+user_history
+ip_reputation
+block
+close
+escalate
+email
+security_report
+
+---
+
+## 2. Transport Layer
+
+The project demonstrates both MCP transports:
+
+### Development Phase
+
+Used local STDIO transport:
+
+
+PythonStdioTransport
+
+
+### Final Phase
+
+Migrated to remote communication using:
+
+
+Streamable HTTP Transport
+
+
+Example:
+
+
+http://127.0.0.1:8000/mcp
+
+
+---
+
+## 3. Progress Tracking
+
+Implemented through the `security_report` tool.
+
+The server sends progress updates while performing a multi-step operation, allowing the client to receive feedback during execution.
+
+---
+
+## 4. Defensive Tool Design
+
+The `block` tool follows defensive design principles.
+
+Implemented:
+
+### JSON Schema Constraints
+
+Input validation using structured schemas:
+
+- Valid IP format
+- Valid administrator ID
+
+### Server-side Validation
+
+Independent validation inside the tool handler.
+
+### Authorization Checks
+
+The server verifies that the requesting user has the required role:
+
+
+Security Manager
+
+
+before allowing sensitive actions.
+
+### Audit Logging
+
+All security-sensitive actions are recorded.
+
+---
+
+# Technologies Used
+
+- Python
+- FastMCP
+- MCP Protocol
+- SQLite Database
+- AsyncIO
+- Streamable HTTP Transport
+
+---
+
+# Running the Project
+
+## Start MCP Server
+
+
+python run_server.py
+
+
+---
+
+## Start Client
+
+
 python -m client.agent
-```
 
-The demo client (`client/agent.py`) exercises every concern in one run:
-tool/resource/prompt discovery, a normal-device isolation (no pause), a
-critical-device isolation (pauses for elicitation on the client console), an
-unauthorized incident closure attempt, an authorized one, an escalation, and
-a sampling-backed closure report.
 
-## 7. What We'd Still Worry About in Production
+---
 
-- Elicitation and sampling currently fall back to a console prompt / local
-  fallback text — a real deployment needs an actual UI-side approval flow
-  and a properly scoped Anthropic API key per session, not a shared one.
-- Role is currently passed as a plain `user_id` argument the caller
-  supplies; a production version needs real session-bound identity instead
-  of trusting the argument.
-- `tools/list_changed` for role-based tool visibility is designed but not
-  yet wired to a live session/role change event.
+# Example Workflow
+
+1. Client connects to MCP server.
+2. Server capabilities are discovered.
+3. User selects a security operation.
+4. Client calls the corresponding MCP tool.
+5. Server validates the request.
+6. Database operation is executed.
+7. Result is returned to the client.
+
+---
+
+# Future Improvements
+
+- Add more SOC automation tools.
+- Integrate real threat intelligence APIs.
+- Add authentication tokens for users.
+- Improve report generation with machine learning based threat analysis.
+  (planned: gate this via `tools/list_changed` based on declared client
+  capabilities).
+
