@@ -91,3 +91,10 @@ CREATE TABLE policies (
     category TEXT NOT NULL,
     content TEXT NOT NULL
 );
+
+CREATE TABLE blocked_ips (
+    ip TEXT PRIMARY KEY,
+    blocked_by INTEGER,
+    blocked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (blocked_by) REFERENCES users(user_id)
+);

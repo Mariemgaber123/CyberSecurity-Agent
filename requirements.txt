@@ -1,0 +1,394 @@
+# CyberSecurity Agent - MCP Based SOC System
+
+## Overview
+
+CyberSecurity Agent is a simulated Security Operations Center (SOC) system built using the Model Context Protocol (MCP).
+
+The project demonstrates how an MCP client can interact with an MCP server that exposes security tools for investigating and responding to incidents.
+
+The system provides:
+
+* User investigation
+* IP reputation checking
+* IP blocking
+* Incident management
+* Email notification simulation
+* Incident escalation
+* AI-generated security reports
+
+The project was developed by **Mariem Gaber** and **Aser Alaa**.
+
+At the beginning, we divided the tasks between us, then collaborated on the implementation, debugging, integration, and final improvements to reach the complete solution.
+
+---
+
+# Architecture
+
+The project follows an MCP client-server architecture:
+
+```
+                +----------------+
+                |   User Input   |
+                +--------+-------+
+                         |
+                         |
+                  +------v------+
+                  | MCP Client  |
+                  |  Agent      |
+                  +------+------+
+                         |
+                  MCP Protocol
+                         |
+                  +------v------+
+                  | MCP Server  |
+                  | FastMCP     |
+                  +------+------+
+                         |
+          +--------------+--------------+
+          |                             |
+     Security Tools                Database
+          |
+          |
+     Sampling Request
+          |
+          v
+     Client-side LLM
+     (Groq Llama)
+```
+
+---
+
+# Project Structure
+
+```
+CyberSecurity-Agent/
+│
+├── client/
+│   └── agent.py
+│
+├── mcp_server/
+│   ├── server.py
+│   ├── db.py
+│   └── database files
+│
+├── shared/
+│   ├── tools.py
+│   └── llm.py
+│
+├── check_db.py
+├── requirements.txt
+└── README.md
+```
+
+---
+
+# Technologies Used
+
+* Python
+* FastMCP
+* MCP Protocol
+* SQLite Database
+* Pydantic Validation
+* Groq API
+* Llama 3.3 Model
+* Async Programming
+
+---
+
+# MCP Tools
+
+The MCP server exposes the following tools:
+
+| Tool              | Description                                    |
+| ----------------- | ---------------------------------------------- |
+| `user_history`    | Retrieves user information from the database   |
+| `ip_reputation`   | Checks IP threat intelligence information      |
+| `block`           | Blocks a device IP after authorization check   |
+| `close`           | Closes a security incident                     |
+| `escalate`        | Escalates an incident                          |
+| `email`           | Simulates sending an email notification        |
+| `security_report` | Generates a security report using MCP Sampling |
+
+---
+
+
+# Read-only vs Write Tools
+
+The MCP tools are divided into two categories depending on whether they only retrieve information or modify system state.
+
+| Tool              | Type                 | Description                                                                              |
+| ----------------- | -------------------- | ---------------------------------------------------------------------------------------- |
+| `user_history`    | Read-only            | Retrieves user information from the database without modifying any data.                 |
+| `ip_reputation`   | Read-only            | Checks threat intelligence information for an IP address.                                |
+| `security_report` | Read-only + Sampling | Reads incident and audit data, then uses MCP Sampling to generate an AI security report. |
+| `block`           | Write                | Changes device status to Offline and creates an audit log entry.                         |
+| `close`           | Write                | Updates incident status and records the closing action.                                  |
+| `escalate`        | Write                | Creates an escalation action for an incident.                                            |
+| `email`           | Write                | Simulates sending an email and records the action in audit logs.                         |
+
+## Write Tool Safety Controls
+
+Write operations apply additional security checks before modifying the database:
+
+* Input validation using Pydantic models.
+* Authorization checks based on user roles.
+* Database existence checks before updates.
+* Audit logging for performed actions.
+
+Example:
+
+`block` tool:
+
+1. Validates the IP format.
+2. Checks that the user has Security Manager privileges.
+3. Verifies that the device exists.
+4. Updates the device status.
+5. Stores the action in the audit logs.
+
+This separation ensures that read operations remain safe while write operations require additional validation and authorization.
+
+
+
+
+# Tool Details
+
+## User History
+
+Retrieves user information:
+
+Input:
+
+```json
+{
+"user": "Mariem Gaber"
+}
+```
+
+Returns user details such as:
+
+* ID
+* Role
+* Department
+
+---
+
+## IP Reputation
+
+Checks whether an IP exists in threat intelligence data.
+
+Example:
+
+```json
+{
+"ip": "192.168.1.50"
+}
+```
+
+Returns:
+
+* Reputation
+* Severity
+* IP information
+
+---
+
+## Block IP
+
+A write operation that changes device status.
+
+The tool performs:
+
+1. IP format validation
+2. Authorization check
+3. Device existence check
+4. Database update
+5. Audit logging
+
+Only users with the Security Manager role can perform this action.
+
+---
+
+## Incident Management
+
+### Close Incident
+
+Closes an existing incident after checking authorization.
+
+### Escalate Incident
+
+Creates an escalation action linked to the incident.
+
+---
+
+## Email Notification
+
+Simulates sending an email notification and stores the action in the audit logs.
+
+---
+
+# MCP Sampling
+
+The project implements MCP Sampling for AI-generated security reports.
+
+The workflow:
+
+1. The server retrieves incident and audit data from the database.
+2. The server builds a report generation prompt.
+3. The server calls:
+
+```python
+await ctx.sample(prompt)
+```
+
+4. The MCP client receives the sampling request.
+5. The client-side LLM generates the final report.
+6. The result is returned to the server.
+
+The client uses Groq API with the Llama model to provide the LLM response.
+
+If sampling is unavailable, the tool fails gracefully and returns the raw security data instead of crashing.
+
+---
+
+# Progress Tracking
+
+The project includes progress tracking for long-running operations.
+
+The client provides a progress handler:
+
+```python
+async def progress_handler(*args):
+    print("Progress update:", args)
+```
+
+The handler receives progress updates from the MCP server during long-running tasks.
+
+This prevents the client from being blocked without feedback.
+
+---
+
+# Defensive Tool Design
+
+The project applies validation and security checks for sensitive operations.
+
+## Pydantic Validation
+
+Example:
+
+```python
+class BlockIPRequest(BaseModel):
+    ip: str
+    admin_id: int
+```
+
+Validation ensures:
+
+* Correct input format
+* Valid IDs
+* Safer tool execution
+
+## Authorization Checks
+
+Write operations verify user permissions before modifying the system.
+
+Examples:
+
+* Blocking IP requires Security Manager role.
+* Closing incidents requires Security Manager role.
+
+---
+
+# Database
+
+The system uses SQLite to store:
+
+## Users
+
+Contains:
+
+* User identity
+* Role
+* Department
+
+## Devices
+
+Stores:
+
+* IP addresses
+* Device status
+
+## Incidents
+
+Stores:
+
+* Incident title
+* Severity
+* Status
+* Creation time
+
+## Audit Logs
+
+Tracks performed actions:
+
+Examples:
+
+```
+Block IP
+Close Incident
+Send Email
+```
+
+---
+
+# Transport
+
+The MCP server runs using Streamable HTTP transport:
+
+```
+http://127.0.0.1:8000/mcp
+```
+
+The client connects through this endpoint and discovers available tools dynamically.
+
+---
+
+# Running the Project
+
+## Start MCP Server
+
+```
+python -m mcp_server.server
+```
+
+## Start Client
+
+```
+python -m client.agent
+```
+
+---
+
+# Demo
+
+The demo shows:
+
+* Tool discovery
+* User lookup
+* IP reputation checking
+* Blocking an IP
+* Closing incidents
+* Sending notifications
+* Generating AI security reports
+
+The generated security report demonstrates MCP Sampling working between the server and the client-side LLM.
+
+---
+
+# Team Contribution
+
+The project was implemented by:
+
+* **Mariem Gaber**
+* **Aser Alaa**
+
+We initially divided the tasks, then worked together on integration, debugging, testing, and improving the final architecture until reaching the completed SOC MCP system.
