@@ -1,44 +1,96 @@
-import asyncio
-from fastmcp import FastMCP
-from .capabilities import CAPABILITIES
-from .resources import read_resource
-from .prompts import get_prompt
 
-mcp = FastMCP("CyberSecurityAgent")
+from fastmcp import FastMCP, Context
+from pydantic import BaseModel, Field #Validation
 
-# استيراد ملف الأدوات بعد تعريف mcp
-from . import tools
-@mcp.resource("policy://critical-device-isolation")
-def isolation_policy() -> str:
-    return read_resource("policy://critical-device-isolation") or "Policy not found."
+class BlockIPRequest(BaseModel):
 
-@mcp.resource("policy://incident-closure")
-def closure_policy() -> str:
-    return read_resource("policy://incident-closure") or "Policy not found."
+    ip: str = Field(
+        pattern=r"^(\d{1,3}\.){3}\d{1,3}$"
+    )
 
-@mcp.prompt("incident_summary")
-def prompt_summary(incident_id: str) -> str:
-    return get_prompt("incident_summary").format(incident_id=incident_id)
+    admin_id: int = Field(
+        gt=0
+    )
 
-@mcp.prompt("threat_analysis")
-def prompt_threat(indicator: str) -> str:
-    return get_prompt("threat_analysis").format(indicator=indicator)
+from shared.tools import (
+    get_user_history,
+    check_ip_reputation,
+    block_ip,
+    send_email,
+    escalate_case,
+    close_alert,
+    generate_report,
+)
 
-@mcp.prompt("closure_report")
-def prompt_closure(incident_id: str) -> str:
-    return get_prompt("closure_report").format(incident_id=incident_id)
+mcp = FastMCP("CyberSecurity Server")
 
 @mcp.tool
-def ping() -> str:
-    """Check that the MCP server is running."""
-    return "MCP Server is running!"
+def user_history(user: str):
+    return get_user_history(user)
 
-if __name__ == "__main__":
-    print("Initializing MCP Server...")
-    print("Capabilities:", CAPABILITIES)
 
-    mcp.run(
-        transport="sse",
-        host="127.0.0.1",
-        port=8000
+@mcp.tool
+def ip_reputation(ip: str):
+    return check_ip_reputation(ip)
+
+
+@mcp.tool
+def block(request: BlockIPRequest):
+
+    return block_ip(
+        request.ip,
+        request.admin_id
     )
+
+@mcp.tool
+def close(incident_id: int, admin_id: int):
+    return close_alert(incident_id, admin_id)
+
+
+@mcp.tool
+def escalate(incident_id: int):
+    return escalate_case(incident_id)
+
+
+@mcp.tool
+def email(user: str):
+    return send_email(user)
+
+@mcp.tool
+async def security_report(days: int, ctx: Context):
+
+    data = generate_report(days)
+
+    prompt = f"""
+    You are a SOC analyst.
+
+    Generate a security report for the last {days} days.
+
+    Data:
+    {data}
+
+    Include:
+    - Summary
+    - Detected threats
+    - Severity analysis
+    - Recommendations
+    """
+
+    try:
+        result = await ctx.sample(prompt)
+
+        return {
+            "success": True,
+            "report": result.text
+        }
+
+    except Exception as e:
+        return {
+            "success": True,
+            "report": data,
+            "message": "LLM sampling unavailable"
+        }
+
+    
+if __name__ == "__main__":
+    mcp.run()
